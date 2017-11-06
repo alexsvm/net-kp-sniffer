@@ -381,7 +381,20 @@ int main()
 			}
 
 			// Печатаем заголовок DNS пакета...
-			dns_hdr->
+			printf("--==##DNS-Packet##==--\r\nHeader:\r\n");
+			printf("Transaction ID: 0x%04x \r\n", htons(dns_hdr->id));
+			printf("Flags:\r\n");
+			printf("    Is response: %d\n", dns_hdr->is_response);
+			printf("    Opcode: %d\n", dns_hdr->operation_code);
+			printf("    Truncated: %d\n", dns_hdr->truncated_message);
+			printf("    Recursion desired: %d\n", dns_hdr->recursion_desired);
+			printf("    Reserver: %d\n", dns_hdr->reserved);
+			//printf("    Truncated: %d\n", dns_hdr->authenticated_data);
+			printf("Questions: %d\n", htons(dns_hdr->question_count));
+			printf("Answer RRs: %d\n", htons(dns_hdr->answer_count));
+			printf("Authority RRs: %d\n", htons(dns_hdr->authority_record_count));
+			printf("Additional RRs: %d\n", htons(dns_hdr->additional_record_count));
+
 			//
 			// increment offset
 			//offset += DNS_HDR_LEN;
