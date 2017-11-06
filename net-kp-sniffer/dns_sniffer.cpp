@@ -18,6 +18,10 @@ bcc32 -osniffer.exe sniffer.cpp Ws2_32.lib
 #define MAX_PACKET_SIZE    0x10000
 #define MAX_PACKET_SIZE    0x10000
 #define SIO_RCVALL         0x98000001
+#define LIL_ENDIAN 0
+#define BIG_ENDIAN 1
+#define BYTE_ORDER BIG_ENDIAN
+
 // Буфер для приёма данных
 char Buffer[MAX_PACKET_SIZE]; // 64 Kb
 
@@ -35,6 +39,111 @@ typedef struct IPHeader {
 	ULONG   iph_src;      // IP-адрес отправителя
 	ULONG   iph_dest;     // IP-адрес назначения
 } IPHeader;
+
+typedef struct TCPHeader
+{
+	USHORT  source_port;       // (16 bits)
+	USHORT  destination_port;  // (16 bits)
+	ULONG	seq_number;        // Sequence Number (32 bits)
+	ULONG	ack_number;        // Acknowledgment Number (32 bits)
+	USHORT  info_ctrl;         // Data Offset (4 bits), Reserved (6 bits), Control bits (6 bits)
+	USHORT  window;            // (16 bits)
+	USHORT  checksum;          // (16 bits)
+	USHORT  urgent_pointer;    // (16 bits)
+} TCPHeader;
+
+typedef struct UDPHeader
+{
+	USHORT   source_port;
+	USHORT   destination_port;
+	USHORT   length;
+	USHORT   checksum;
+} UDPHeader;
+
+/*
+typedef struct DNSHeader
+{
+	USHORT id;
+	USHORT flags;
+	USHORT question_count;
+	USHORT answer_count;
+	USHORT name_server_count;
+	USHORT additional_record_count;
+} DNSHeader;
+*/
+
+#define DNS_HDR_LEN 12
+
+struct DNSHeader
+{
+	USHORT        id;
+
+#if BYTE_ORDER == LIL_ENDIAN
+	USHORT        recursion_desired : 1;
+	USHORT        truncated_message : 1;
+	USHORT        authoritive_answer : 1;
+	USHORT        operation_code : 4;
+	USHORT        is_response : 1;
+
+	USHORT        response_code : 4;
+	USHORT        checking_disabled : 1;
+	USHORT        authenticated_data : 1;
+	USHORT        reserved : 1;
+	USHORT        recursion_available : 1;
+#elif BYTE_ORDER == BIG_ENDIAN
+	USHORT        is_response : 1;
+	USHORT        operation_code : 4;
+	USHORT        authoritive_answer : 1;
+	USHORT        truncated_message : 1;
+	USHORT        recursion_desired : 1;
+
+	USHORT        recursion_available : 1;
+	USHORT        reserved : 1;
+	USHORT        authenticated_data : 1;
+	USHORT        checking_disabled : 1;
+	USHORT        response_code : 4;
+#else
+#    error BYTE_ORDER not defined.
+#endif
+
+	USHORT        question_count;
+	USHORT        answer_count;
+	USHORT        authority_record_count;
+	USHORT        additional_record_count;
+};
+
+
+#define DNS_QUERY_DATA_LEN 4
+
+struct DNSQuestionData
+{
+	unsigned short        question_type;
+	unsigned short        question_class;
+};
+
+struct DNSQuestion
+{
+	unsigned char*      name;
+	DNSQuestionData*    data;
+};
+
+
+#define DNS_RECORD_DATA_LEN 10
+
+struct DNSRecordData
+{
+	unsigned short    record_type;
+	unsigned short    record_class;
+	unsigned int      ttl;
+	unsigned short    response_length;
+};
+
+struct DNSRecord
+{
+	unsigned char*    name;
+	DNSRecordData*    data;
+	unsigned char*    response;
+};
 
 char * ConvertToBinary(int b)
 {
@@ -135,6 +244,37 @@ int main()
 		if (count >= sizeof(IPHeader))
 		{
 			IPHeader* hdr = (IPHeader *)Buffer;
+			TCPHeader* tcp_hdr = (TCPHeader*)(Buffer + sizeof(IPHeader));
+			UDPHeader* udp_hdr = (UDPHeader*)(Buffer + sizeof(IPHeader));
+			// cast dns header
+			DNSHeader* dns_hdr;
+
+			// Проверяем, является ли пакет DNS
+			switch (hdr->iph_protocol)
+			{
+			case IPPROTO_TCP:
+				dns_hdr = (DNSHeader*)tcp_hdr + sizeof(TCPHeader);
+				//printf("TCP\n");
+				//printf("TCP source port = %d\n", tcp_hdr->source_port);
+				//printf("TCP destination port = %d\n", tcp_hdr->destination_port);
+				if (!(htons(tcp_hdr->destination_port) == 53 || htons(tcp_hdr->source_port) == 53))
+					continue;
+				break;
+
+			case IPPROTO_UDP:
+				dns_hdr = (DNSHeader*)udp_hdr + sizeof(UDPHeader);
+				//printf("UDP\n");
+				//printf("UDP source port = %d, ", htons(udp_hdr->source_port));
+				//printf("UDP destination port = %d\n", htons(udp_hdr->destination_port));
+				if (!(htons(udp_hdr->destination_port) == 53 || htons(udp_hdr->source_port) == 53))
+					continue;
+				break;
+			default:
+				//printf("OTHER %i", hdr->iph_protocol);
+				//printf("Skip...");
+				continue;
+			}
+
 			//Начинаем разбор пакета...
 			//Разбираем заголовок
 			printf("-=IP-Packet=-\r\nHeader:\r\n");
@@ -218,7 +358,42 @@ int main()
 			sa1.s_addr = hdr->iph_dest;
 			printf(inet_ntoa(sa1));
 			printf("\r\n");
+			
+			// Печатаем заголовок TCP или UDP пакета...
+			switch (hdr->iph_protocol)
+			{
+			case IPPROTO_TCP:
+				printf("-==TCP-Packet==-\r\nHeader:\r\n");
+				printf("TCP source port: %d, ", htons(tcp_hdr->source_port));
+				printf("TCP destination port: %d\n", htons(tcp_hdr->destination_port));
+				printf("Sequence Number: %d\n", htonl(tcp_hdr->seq_number));
+				printf("Acknowledgement Number: %d\n", htonl(tcp_hdr->ack_number));
+				printf("Checksumm: 0x%04x\n", htons(tcp_hdr->checksum));
+				break;
 
+			case IPPROTO_UDP:
+				printf("-==UDP-Packet==-\r\nHeader:\r\n");
+				printf("UDP source port: %d, ", htons(udp_hdr->source_port));
+				printf("UDP destination port: %d\n", htons(udp_hdr->destination_port));
+				printf("Length: %d\n", htons(udp_hdr->length));
+				printf("Checksumm: 0x%04x\n", htons(udp_hdr->checksum));
+				break;
+			}
+
+			// Печатаем заголовок DNS пакета...
+			dns_hdr->
+			//
+			// increment offset
+			//offset += DNS_HDR_LEN;
+
+			//dns_question q; 
+			//dns_question* question = &q;
+			
+			//question->name = (unsigned char*)data + offset;
+
+			//
+
+			/*
 			unsigned short packet_size = ntohs(hdr->iph_length);
 
 			char *buff = (char*)(Buffer + sizeof(IPHeader));
@@ -236,6 +411,7 @@ int main()
 					count = 0;
 				}
 			}
+			*/
 			printf("\n\n");
 		}
 	}
