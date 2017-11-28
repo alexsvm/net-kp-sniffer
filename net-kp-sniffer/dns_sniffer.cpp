@@ -274,10 +274,11 @@ int main()
 				//printf("Skip...");
 				continue;
 			}
+			
 
 			//Начинаем разбор пакета...
 			//Разбираем заголовок
-			printf("-=IP-Packet=-\r\nHeader:\r\n");
+			printf("----------==========IP-Packet==========----------\r\nHeader:\r\n");
 			//Выводим версию IP-протокола
 			printf("Version: %i\r\n", ((hdr->iph_verlen & 0xF0) >> 4));
 			//Выводим длину заголовка
@@ -363,7 +364,7 @@ int main()
 			switch (hdr->iph_protocol)
 			{
 			case IPPROTO_TCP:
-				printf("-==TCP-Packet==-\r\nHeader:\r\n");
+				printf("---===TCP-Packet===---\r\nHeader:\r\n");
 				printf("TCP source port: %d, ", htons(tcp_hdr->source_port));
 				printf("TCP destination port: %d\n", htons(tcp_hdr->destination_port));
 				printf("Sequence Number: %d\n", htonl(tcp_hdr->seq_number));
@@ -372,7 +373,7 @@ int main()
 				break;
 
 			case IPPROTO_UDP:
-				printf("-==UDP-Packet==-\r\nHeader:\r\n");
+				printf("---===UDP-Packet===---\r\nHeader:\r\n");
 				printf("UDP source port: %d, ", htons(udp_hdr->source_port));
 				printf("UDP destination port: %d\n", htons(udp_hdr->destination_port));
 				printf("Length: %d\n", htons(udp_hdr->length));
@@ -381,7 +382,7 @@ int main()
 			}
 
 			// Печатаем заголовок DNS пакета...
-			printf("--==##DNS-Packet##==--\r\nHeader:\r\n");
+			printf("---===---DNS-Packet---===---\r\nHeader:\r\n");
 			printf("Transaction ID: 0x%04x \r\n", htons(dns_hdr->id));
 			printf("Flags:\r\n");
 			printf("    Is response: %d\n", dns_hdr->is_response);
@@ -399,13 +400,13 @@ int main()
 			// increment offset
 			//offset += DNS_HDR_LEN;
 
-			//dns_question q; 
-			//dns_question* question = &q;
+			//dns_q = (DNSQuestion*)dns_hdr + sizeof(DNSHeader);
+
+			DNSQuestion q; 
+			DNSQuestion* question = &q;
 			
-			//question->name = (unsigned char*)data + offset;
-
-			//
-
+			question->name = (unsigned char*)dns_hdr + sizeof(DNSHeader);
+			printf("------- question name:%s\n", question->name);
 			/*
 			unsigned short packet_size = ntohs(hdr->iph_length);
 
