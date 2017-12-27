@@ -29,6 +29,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\wireshark_log.pcap" />
+    <None Include="..\АВМ._net_КП.docx" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\wireshark_log.txt" />
