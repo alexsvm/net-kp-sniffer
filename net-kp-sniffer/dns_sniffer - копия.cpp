@@ -1,10 +1,11 @@
 /*
 Simple IP sniffer
-File: dns_sniffer.cpp
+File: sniffer.cpp
 
 Compile example:
 bcc32 -osniffer.exe sniffer.cpp Ws2_32.lib
 
+(c) 2007, BSTU. Alexey Drozdov
 (c) 2009, BSTU. Dmitry Korostelyov
 */
 
@@ -12,6 +13,7 @@ bcc32 -osniffer.exe sniffer.cpp Ws2_32.lib
 #include <stdio.h>
 #include <winsock2.h>
 #include <string.h>
+
 
 #define MAX_PACKET_SIZE    0x10000
 #define MAX_PACKET_SIZE    0x10000
@@ -23,7 +25,8 @@ bcc32 -osniffer.exe sniffer.cpp Ws2_32.lib
 // Буфер для приёма данных
 char Buffer[MAX_PACKET_SIZE]; // 64 Kb
 
-//Структура заголовка IP-пакета
+							  //Структура заголовка IP-пакета
+
 typedef struct IPHeader {
 	UCHAR   iph_verlen;   // версия и длина заголовка
 	UCHAR   iph_tos;      // тип сервиса
@@ -57,10 +60,24 @@ typedef struct UDPHeader
 	USHORT   checksum;
 } UDPHeader;
 
+/*
+typedef struct DNSHeader
+{
+	USHORT id;
+	USHORT flags;
+	USHORT question_count;
+	USHORT answer_count;
+	USHORT name_server_count;
+	USHORT additional_record_count;
+} DNSHeader;
+*/
+
 #define DNS_HDR_LEN 12
+
 struct DNSHeader
 {
 	USHORT        id;
+
 #if BYTE_ORDER == LIL_ENDIAN
 	USHORT        recursion_desired : 1;
 	USHORT        truncated_message : 1;
@@ -97,6 +114,7 @@ struct DNSHeader
 
 
 #define DNS_QUERY_DATA_LEN 4
+
 struct DNSQuestionData
 {
 	unsigned short        question_type;
@@ -109,7 +127,9 @@ struct DNSQuestion
 	DNSQuestionData*    data;
 };
 
+
 #define DNS_RECORD_DATA_LEN 10
+
 struct DNSRecordData
 {
 	unsigned short    record_type;
@@ -205,6 +225,7 @@ int main()
 	//
 	wait_.tv_sec = 0;
 	wait_.tv_usec = 500;
+
 
 	// Бесконечный цикл приёма IP-пакетов.
 	while (!kbhit())
