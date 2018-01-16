@@ -164,6 +164,28 @@ unsigned short ip_sum_calc(char *buffer, int len)
 	return ((unsigned short)sum);
 }
 
+void parse_dns(unsigned char* buffer, int offset)
+{
+	char buf[1024] = { 0 };
+	char tmp[100] = { 0 };
+
+	offset += 12;
+	unsigned char *curr = buffer + offset;
+	while (*curr) {
+		strncpy(tmp, (const char*)curr + 1, *curr);
+		strcat(tmp, ".");
+		strcat(buf, tmp);
+		memset(tmp, '\0', sizeof(tmp));
+		offset += *curr + 1;
+		curr += *curr + 1;
+	}
+	buf[strlen(buf) - 1] = '\0';
+	//unsigned char *tim = current_time();
+	printf("--------DNS lookup:  target=%s\n", buf);
+	//free(tim);
+}
+
+
 int main()
 {
 	WSADATA         wsadata;   // Инициализация WinSock.
@@ -379,32 +401,15 @@ int main()
 			// increment offset
 			//offset += DNS_HDR_LEN;
 
-			//dns_q = (DNSQuestion*)dns_hdr + sizeof(DNSHeader);
-
-			DNSQuestion q; 
-			DNSQuestion* question = &q;
-			
-			question->name = (unsigned char*)dns_hdr + sizeof(DNSHeader);
-			printf("------- question name:%s\n", question->name);
-			/*
-			unsigned short packet_size = ntohs(hdr->iph_length);
-
-			char *buff = (char*)(Buffer + sizeof(IPHeader));
-			int size = packet_size - sizeof(IPHeader);
-
-			printf("DATA: \r\n");
-			int count = 0;
-			for (int i = 0; i<size; i++)
-			{
-				printf("%02X ", buff[i] & 0xff);
-				count++;
-				if (count == 16)
-				{
-					printf("\r\n");
-					count = 0;
-				}
-			}
-			*/
+			//DNSQuestion q; 
+			//DNSQuestion* question = &q;
+			//dns_hdr = (DNSHeader*)udp_hdr + sizeof(UDPHeader);
+			//q.name = (unsigned char*)dns_hdr + sizeof(DNSHeader);
+			//q.data = q.name + 2;
+			//question->name = (unsigned char*)dns_hdr + sizeof(DNSHeader);
+			//printf("------- question name:%s\n", q.name);
+			parse_dns((unsigned char*)dns_hdr, 0);
+		
 			printf("\n\n");
 		}
 	}
