@@ -296,19 +296,15 @@ int main()
 			strcpy(str, ConvertToBinary(hdr->iph_offset));
 			str[3] = '\0';
 			printf("Flags: 0x%sb", str);
-			if (str[2] == '1' || str[1] == '1')
-			{
+			if (str[2] == '1' || str[1] == '1') {
 				strcpy(temp, " (");
-				if (str[1] == '1')
-				{
+				if (str[1] == '1') {
 					strcat(temp, "Don't Fragment");
-					if (str[2] == '1')
-					{
+					if (str[2] == '1') {
 						strcat(temp, ", ");
 					}
 				}
-				if (str[2] == '1')
-				{
+				if (str[2] == '1') {
 					strcat(temp, "More Fragments");
 				}
 				strcat(temp, ")");
@@ -327,22 +323,20 @@ int main()
 			case IPPROTO_TCP:
 				printf("TCP");
 				break;
-
 			case IPPROTO_UDP:
 				printf("UDP");
 				break;
+			//case IPPROTO_ICMP:
+			//	printf("ICMP");
+			//	break;
 
-			case IPPROTO_ICMP:
-				printf("ICMP");
-				break;
+			//case 47:
+			//	printf("GRE");
+			//	break;
 
-			case 47:
-				printf("GRE");
-				break;
-
-			default:
-				printf("OTHER %i", hdr->iph_protocol);
-				break;
+			//default:
+			//	printf("OTHER %i", hdr->iph_protocol);
+			//	break;
 			}
 			printf("\r\n");
 			printf("Header checksum: %x", hdr->iph_xsum);
@@ -408,6 +402,7 @@ int main()
 			//q.data = q.name + 2;
 			//question->name = (unsigned char*)dns_hdr + sizeof(DNSHeader);
 			//printf("------- question name:%s\n", q.name);
+			
 			parse_dns((unsigned char*)dns_hdr, 0);
 		
 			printf("\n\n");
