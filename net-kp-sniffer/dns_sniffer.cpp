@@ -20,10 +20,14 @@ bcc32 -osniffer.exe sniffer.cpp Ws2_32.lib
 #define BIG_ENDIAN 1
 #define BYTE_ORDER BIG_ENDIAN
 
-// Буфер для приёма данных
-char Buffer[MAX_PACKET_SIZE]; // 64 Kb
+#define IP_HDR_LEN 20
+#define TCP_HDR_LEN 20
+#define UDP_HDR_LEN 8
+#define DNS_HDR_LEN 12
 
-//Структура заголовка IP-пакета
+// Буфер для приёма данных
+char Buffer[MAX_PACKET_SIZE]; // 64 Kb#define 
+
 typedef struct IPHeader {
 	UCHAR   iph_verlen;   // версия и длина заголовка
 	UCHAR   iph_tos;      // тип сервиса
@@ -49,6 +53,7 @@ typedef struct TCPHeader
 	USHORT  urgent_pointer;    // (16 bits)
 } TCPHeader;
 
+
 typedef struct UDPHeader
 {
 	USHORT   source_port;
@@ -57,7 +62,6 @@ typedef struct UDPHeader
 	USHORT   checksum;
 } UDPHeader;
 
-#define DNS_HDR_LEN 12
 struct DNSHeader
 {
 	USHORT        id;
@@ -95,6 +99,10 @@ struct DNSHeader
 	USHORT        additional_record_count;
 };
 
+IPHeader* hdr = (IPHeader *)Buffer;
+TCPHeader* tcp_hdr = (TCPHeader*)(Buffer + IP_HDR_LEN);
+UDPHeader* udp_hdr = (UDPHeader*)(Buffer + IP_HDR_LEN);
+DNSHeader* dns_hdr;
 
 #define DNS_QUERY_DATA_LEN 4
 struct DNSQuestionData
@@ -164,7 +172,8 @@ unsigned short ip_sum_calc(char *buffer, int len)
 	return ((unsigned short)sum);
 }
 
-void parse_dns(unsigned char* buffer, int offset)
+int parse_dns_query(unsigned char* buffer, int offset)
+//unsigned char* parse_dns_query(unsigned char* buffer, int offset)
 {
 	char buf[1024] = { 0 };
 	char tmp[100] = { 0 };
@@ -180,9 +189,66 @@ void parse_dns(unsigned char* buffer, int offset)
 		curr += *curr + 1;
 	}
 	buf[strlen(buf) - 1] = '\0';
-	//unsigned char *tim = current_time();
-	printf("--------DNS lookup:  target=%s\n", buf);
-	//free(tim);
+	printf("\t\tDNS lookup:\n\t\t  target=%s\n", buf);
+	unsigned short* query_type = (unsigned short*) (curr+3);
+	unsigned short* query_class = (unsigned short*) (curr+1);
+	printf("\t\t  query type=%u\n", htons(*query_type));
+	printf("\t\t  query class=%u\n", htons(*query_class)); 
+	//return curr + 5;
+	return offset + 5;
+}
+
+unsigned short parse_dns_answer(unsigned char* buffer, int offset)
+{
+	char buf[1024] = { 0 };
+	char tmp[100] = { 0 };
+
+	unsigned char *curr = buffer + offset;
+	unsigned char LLLL = *(curr);
+	unsigned long long l1 = *(curr);
+	if (LLLL & 0xC0) {
+		unsigned short off = htons((unsigned short)(*curr)) & 0x3fff;
+		curr = buffer + off + 12;
+	}
+
+	while (*curr) {
+		strncpy(tmp, (const char*)curr + 1, *curr);
+		strcat(tmp, ".");
+		strcat(buf, tmp);
+		memset(tmp, '\0', sizeof(tmp));
+		//offset += *curr + 1;
+		curr += *curr + 1;
+	}
+	if (LLLL & 0xC0) {
+		curr = buffer + offset + 1;
+	}
+	buf[strlen(buf) - 1] = '\0';
+	printf("\t\tDNS answer:\n\t\t  target=%s\n", buf);
+	unsigned short* query_type = (unsigned short*)(curr + 3);
+	unsigned short* query_class = (unsigned short*)(curr + 1);
+	unsigned long* ttl = (unsigned long*)(curr + 5);
+	unsigned short* data_length = (unsigned short*)(curr + 9);
+	printf("\t\t  query type=%u\n", htons(*query_type));
+	printf("\t\t  query class=%u\n", htons(*query_class));
+	printf("\t\t  data length=%u\n", htons(*data_length));
+	printf("\t\t  addr=");
+	char dl;
+	int L = (htons(*data_length));
+	if (L == 4)
+		dl = '.';
+	else
+		dl = ':';
+	for (int i = 0; i < L; i++) {
+		unsigned char* B = (curr + 11 + i);
+		if (dl == '.')
+			printf("%u", *B);
+		else
+			printf("%x", *B);
+		if ((L - i) > 1)
+			printf("%c", dl);
+	}
+
+	return offset;
 }
 
 
@@ -244,39 +310,27 @@ int main()
 		// обработка IP-пакета
 		if (count >= sizeof(IPHeader))
 		{
-			IPHeader* hdr = (IPHeader *)Buffer;
-			TCPHeader* tcp_hdr = (TCPHeader*)(Buffer + sizeof(IPHeader));
-			UDPHeader* udp_hdr = (UDPHeader*)(Buffer + sizeof(IPHeader));
+			//IPHeader* hdr = (IPHeader *)Buffer;
+			//TCPHeader* tcp_hdr = (TCPHeader*)(Buffer + IP_HDR_LEN);
+			//UDPHeader* udp_hdr = (UDPHeader*)(Buffer + IP_HDR_LEN);
 			// cast dns header
-			DNSHeader* dns_hdr;
+			//DNSHeader* dns_hdr;
 
 			// Проверяем, является ли пакет DNS
 			switch (hdr->iph_protocol)
 			{
 			case IPPROTO_TCP:
-				dns_hdr = (DNSHeader*)tcp_hdr + sizeof(TCPHeader);
-				//printf("TCP\n");
-				//printf("TCP source port = %d\n", tcp_hdr->source_port);
-				//printf("TCP destination port = %d\n", tcp_hdr->destination_port);
 				if (!(htons(tcp_hdr->destination_port) == 53 || htons(tcp_hdr->source_port) == 53))
 					continue;
+				dns_hdr = (DNSHeader*)(Buffer + IP_HDR_LEN + TCP_HDR_LEN);
 				break;
 
 			case IPPROTO_UDP:
-				dns_hdr = (DNSHeader*)udp_hdr + sizeof(UDPHeader);
-				//printf("UDP\n");
-				//printf("UDP source port = %d, ", htons(udp_hdr->source_port));
-				//printf("UDP destination port = %d\n", htons(udp_hdr->destination_port));
 				if (!(htons(udp_hdr->destination_port) == 53 || htons(udp_hdr->source_port) == 53))
 					continue;
+				dns_hdr = (DNSHeader*)(Buffer + IP_HDR_LEN + UDP_HDR_LEN);
 				break;
-			default:
-				//printf("OTHER %i", hdr->iph_protocol);
-				//printf("Skip...");
-				continue;
 			}
-			
-
 			//Начинаем разбор пакета...
 			//Разбираем заголовок
 			printf("----------==========IP-Packet==========----------\r\nHeader:\r\n");
@@ -359,52 +413,42 @@ int main()
 			switch (hdr->iph_protocol)
 			{
 			case IPPROTO_TCP:
-				printf("---===TCP-Packet===---\r\nHeader:\r\n");
-				printf("TCP source port: %d, ", htons(tcp_hdr->source_port));
-				printf("TCP destination port: %d\n", htons(tcp_hdr->destination_port));
-				printf("Sequence Number: %d\n", htonl(tcp_hdr->seq_number));
-				printf("Acknowledgement Number: %d\n", htonl(tcp_hdr->ack_number));
-				printf("Checksumm: 0x%04x\n", htons(tcp_hdr->checksum));
+				printf("\t> TCP-Packet:\r\n");
+				printf("\tTCP source port: %d, ", htons(tcp_hdr->source_port));
+				printf("\tTCP destination port: %d\n", htons(tcp_hdr->destination_port));
+				printf("\tSequence Number: %d\n", htonl(tcp_hdr->seq_number));
+				printf("\tAcknowledgement Number: %d\n", htonl(tcp_hdr->ack_number));
+				printf("\tChecksumm: 0x%04x\n", htons(tcp_hdr->checksum));
 				break;
 
 			case IPPROTO_UDP:
-				printf("---===UDP-Packet===---\r\nHeader:\r\n");
-				printf("UDP source port: %d, ", htons(udp_hdr->source_port));
-				printf("UDP destination port: %d\n", htons(udp_hdr->destination_port));
-				printf("Length: %d\n", htons(udp_hdr->length));
-				printf("Checksumm: 0x%04x\n", htons(udp_hdr->checksum));
+				printf("\t> UDP-Packet:\r\n");
+				printf("\tUDP source port: %d, ", htons(udp_hdr->source_port));
+				printf("\tUDP destination port: %d\n", htons(udp_hdr->destination_port));
+				printf("\tLength: %d\n", htons(udp_hdr->length));
+				printf("\tChecksumm: 0x%04x\n", htons(udp_hdr->checksum));
 				break;
 			}
 
 			// Печатаем заголовок DNS пакета...
-			printf("---===---DNS-Packet---===---\r\nHeader:\r\n");
-			printf("Transaction ID: 0x%04x \r\n", htons(dns_hdr->id));
-			printf("Flags:\r\n");
-			printf("    Is response: %d\n", dns_hdr->is_response);
-			printf("    Opcode: %d\n", dns_hdr->operation_code);
-			printf("    Truncated: %d\n", dns_hdr->truncated_message);
-			printf("    Recursion desired: %d\n", dns_hdr->recursion_desired);
-			printf("    Reserver: %d\n", dns_hdr->reserved);
+			printf("\t\t> DNS-Packet:\r\n");
+			printf("\t\tTransaction ID: 0x%04x \r\n", htons(dns_hdr->id));
+			printf("\t\tFlags:\r\n");
+			printf("\t\t  Is response: %d\n", dns_hdr->is_response);
+			printf("\t\t  Opcode: %d\n", dns_hdr->operation_code);
+			printf("\t\t  Truncated: %d\n", dns_hdr->truncated_message);
+			printf("\t\t  Recursion desired: %d\n", dns_hdr->recursion_desired);
+			printf("\t\t  Reserver: %d\n", dns_hdr->reserved);
 			//printf("    Truncated: %d\n", dns_hdr->authenticated_data);
-			printf("Questions: %d\n", htons(dns_hdr->question_count));
-			printf("Answer RRs: %d\n", htons(dns_hdr->answer_count));
-			printf("Authority RRs: %d\n", htons(dns_hdr->authority_record_count));
-			printf("Additional RRs: %d\n", htons(dns_hdr->additional_record_count));
+			printf("\t\tQuestions: %d\n", htons(dns_hdr->question_count));
+			printf("\t\tAnswer RRs: %d\n", htons(dns_hdr->answer_count));
+			printf("\t\tAuthority RRs: %d\n", htons(dns_hdr->authority_record_count));
+			printf("\t\tAdditional RRs: %d\n", htons(dns_hdr->additional_record_count));
 
-			//
-			// increment offset
-			//offset += DNS_HDR_LEN;
-
-			//DNSQuestion q; 
-			//DNSQuestion* question = &q;
-			//dns_hdr = (DNSHeader*)udp_hdr + sizeof(UDPHeader);
-			//q.name = (unsigned char*)dns_hdr + sizeof(DNSHeader);
-			//q.data = q.name + 2;
-			//question->name = (unsigned char*)dns_hdr + sizeof(DNSHeader);
-			//printf("------- question name:%s\n", q.name);
-			
-			parse_dns((unsigned char*)dns_hdr, 0);
-		
+			//unsigned char* rr = parse_dns_query((unsigned char*)dns_hdr, 0);
+			int rr = parse_dns_query((unsigned char*)dns_hdr, 0);
+			if (htons(dns_hdr->answer_count))
+				parse_dns_answer((unsigned char*)dns_hdr, rr);
 			printf("\n\n");
 		}
 	}

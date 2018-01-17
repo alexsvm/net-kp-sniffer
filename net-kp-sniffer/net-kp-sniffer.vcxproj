@@ -151,6 +151,10 @@
   <ItemGroup>
     <Image Include="..\Screenshot_1.png" />
     <Image Include="..\Screenshot_10.png" />
+    <Image Include="..\Screenshot_2.png" />
+    <Image Include="..\Screenshot_3.png" />
+    <Image Include="..\Screenshot_4.png" />
+    <Image Include="..\Screenshot_5.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\wireshark_log.pcap" />

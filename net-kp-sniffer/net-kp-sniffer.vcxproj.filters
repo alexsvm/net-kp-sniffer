@@ -26,6 +26,18 @@
     <Image Include="..\Screenshot_10.png">
       <Filter>Файлы ресурсов</Filter>
     </Image>
+    <Image Include="..\Screenshot_2.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="..\Screenshot_3.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="..\Screenshot_4.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="..\Screenshot_5.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\wireshark_log.pcap" />
