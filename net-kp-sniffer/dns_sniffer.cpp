@@ -445,8 +445,10 @@ int main()
 			printf("\t\tAuthority RRs: %d\n", htons(dns_hdr->authority_record_count));
 			printf("\t\tAdditional RRs: %d\n", htons(dns_hdr->additional_record_count));
 
+			// Печатаем dns-запрос
 			//unsigned char* rr = parse_dns_query((unsigned char*)dns_hdr, 0);
 			int rr = parse_dns_query((unsigned char*)dns_hdr, 0);
+			// Печатаем dns-ответы
 			if (htons(dns_hdr->answer_count))
 				parse_dns_answer((unsigned char*)dns_hdr, rr);
 			printf("\n\n");
