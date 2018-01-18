@@ -41,7 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\wireshark_log.pcap" />
-    <None Include="..\АВМ._net_КП.docx" />
+    <None Include="..\АВМ._net_КП 01.docx" />
     <None Include="..\АВМ._net_КП - backup.docx" />
   </ItemGroup>
   <ItemGroup>
